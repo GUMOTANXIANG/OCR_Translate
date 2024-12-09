@@ -27,7 +27,7 @@ class DraggableResizableBox:
 
         # 设置字体样式
         if self.is_translation_box:
-            self.font = QtGui.QFont("Arial", 14)  # 增大字号
+            self.font = QtGui.QFont("Arial", 25)  # 增大字号
         else:
             self.font = QtGui.QFont()
 
@@ -220,7 +220,7 @@ class Overlay(QtWidgets.QWidget):
                         )
                 except Exception as e:
                     print(f"捕获或翻译错误: {e}")
-                time.sleep(0.5)  # 每秒更新一次，可根据需要调整
+                time.sleep(0.5)  # 每0.5秒更新一次，可根据需要调整
 
     @QtCore.pyqtSlot(str)
     def update_translation(self, translated_text):
