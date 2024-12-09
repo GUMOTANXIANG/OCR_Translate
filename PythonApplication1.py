@@ -27,10 +27,9 @@ class DraggableResizableBox:
 
         # 设置字体样式
         if self.is_translation_box:
-            self.font = QtGui.QFont("Arial", 25)  # 增大字号
+            self.font = QtGui.QFont("Arial", 20)  # 增大字号
         else:
             self.font = QtGui.QFont()
-
 
     def paint(self, painter):
         painter.setRenderHint(QtGui.QPainter.Antialiasing)
@@ -51,7 +50,6 @@ class DraggableResizableBox:
             text_rect = self.rect.adjusted(10, 10, -10, -10)  # 增加内边距
             painter.drawText(text_rect, QtCore.Qt.TextWordWrap, self.parent.translated_text)
 
-
     def mouse_press_event(self, event):
         if self.rect.contains(event.pos()):
             # 检查是否在调整大小区域
@@ -65,7 +63,6 @@ class DraggableResizableBox:
             event.accept()
         else:
             event.ignore()
-
 
     def mouse_move_event(self, event):
         if self.dragging:
@@ -95,11 +92,9 @@ class DraggableResizableBox:
             return True
         return False
 
-
     def mouse_release_event(self, event):
         self.dragging = False
         self.resizing = False
-
 
     def contains_point(self, pos):
         return self.rect.contains(pos)
@@ -108,9 +103,9 @@ class DraggableResizableBox:
 class Overlay(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
+        self.translated_text = ""
         self.init_ui()
         self.init_translator()
-        self.translated_text = ""
         self.start_capture_thread()
 
     def init_ui(self):
@@ -120,23 +115,41 @@ class Overlay(QtWidgets.QWidget):
         self.screen_width = screen_geometry.width()
         self.screen_height = screen_geometry.height()
 
-        # 设置窗口属性为全屏
         self.setWindowTitle('实时翻译器')
         self.setWindowFlags(
             QtCore.Qt.WindowStaysOnTopHint |
             QtCore.Qt.FramelessWindowHint
         )
         self.setAttribute(QtCore.Qt.WA_TranslucentBackground)
-        self.setWindowOpacity(0.3)  # 设置透明度，可根据需要调整
-        self.setGeometry(0, 0, self.screen_width, self.screen_height)  # 设置为全屏
+        self.setWindowOpacity(0.3)
+        self.setGeometry(0, 0, self.screen_width, self.screen_height)
 
-        # 创建两个独立的方框
-        # 选择框：绿色
-        selection_rect = QtCore.QRect(100, 100, 300, 200)
+        # 使用QSettings存储和读取方框位置和大小
+        self.settings = QtCore.QSettings("MyCompany", "MyTranslatorApp")
+
+        # 默认方框位置
+        default_selection_rect = QtCore.QRect(100, 100, 300, 200)
+        default_translation_rect = QtCore.QRect(420, 100, 300, 200)
+
+        # 尝试从QSettings中读取方框信息
+        selection_data = self.settings.value("selection_box_geometry", None)
+        if selection_data is not None:
+            # QSettings返回的是QVariant，如果存储的是列表或字符串，需要解析
+            # 假设之前保存为字符串 "left,top,width,height"
+            left, top, width, height = map(int, selection_data.split(","))
+            selection_rect = QtCore.QRect(left, top, width, height)
+        else:
+            selection_rect = default_selection_rect
+
+        translation_data = self.settings.value("translation_box_geometry", None)
+        if translation_data is not None:
+            left, top, width, height = map(int, translation_data.split(","))
+            translation_rect = QtCore.QRect(left, top, width, height)
+        else:
+            translation_rect = default_translation_rect
+
+        # 创建方框
         self.selection_box = DraggableResizableBox(self, selection_rect, (0, 255, 0), is_translation_box=False)
-
-        # 翻译结果框：黑色
-        translation_rect = QtCore.QRect(420, 100, 300, 200)
         self.translation_box = DraggableResizableBox(self, translation_rect, (0, 0, 0), is_translation_box=True)
 
         # 快捷键：Ctrl+T 显示/隐藏窗口
@@ -147,15 +160,13 @@ class Overlay(QtWidgets.QWidget):
         self.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents, False)
 
     def init_translator(self):
-        # 初始化翻译器
         self.translator = Translator()
-        self.running = True  # 控制捕获线程
+        self.running = True
 
-        # 如果Tesseract未添加到系统环境变量中，请手动指定路径
+        # 如果需要手动指定Tesseract路径，请在此处解除注释并修改路径
         # pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
     def toggle_visibility(self):
-        # 切换窗口的可见性
         self.setVisible(not self.isVisible())
 
     def paintEvent(self, event):
@@ -165,22 +176,18 @@ class Overlay(QtWidgets.QWidget):
 
     def mousePressEvent(self, event):
         pos = event.pos()
-        # 先检查翻译框
         if self.translation_box.contains_point(pos):
             self.translation_box.mouse_press_event(event)
-        # 再检查选择框
         elif self.selection_box.contains_point(pos):
             self.selection_box.mouse_press_event(event)
         else:
             super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
-        # 优先处理翻译框的移动
         if self.translation_box.dragging or self.translation_box.resizing:
             if self.translation_box.mouse_move_event(event):
                 self.update()
                 return
-        # 其次处理选择框的移动
         if self.selection_box.dragging or self.selection_box.resizing:
             if self.selection_box.mouse_move_event(event):
                 self.update()
@@ -205,12 +212,12 @@ class Overlay(QtWidgets.QWidget):
                 try:
                     sct_img = sct.grab(monitor)
                     img = Image.frombytes('RGB', sct_img.size, sct_img.rgb)
-                    text = pytesseract.image_to_string(img, lang='eng')  # 使用english识别
-                    print(f"OCR识别文本: {text}")  # 调试用
+                    text = pytesseract.image_to_string(img, lang='eng')  # 使用英文识别
+                    print(f"OCR识别文本: {text}")
                     if text.strip():
-                        # 自动检测源语言，并翻译为英文
-                        translated = self.translator.translate(text, src='en', dest='zh-cn').text  # dest根据需要修改
-                        print(f"翻译结果: {translated}")  # 调试用
+                        # 将英文翻译为中文
+                        translated = self.translator.translate(text, src='en', dest='zh-cn').text
+                        print(f"翻译结果: {translated}")
                         # 在主线程中更新翻译框
                         QtCore.QMetaObject.invokeMethod(
                             self,
@@ -220,22 +227,26 @@ class Overlay(QtWidgets.QWidget):
                         )
                 except Exception as e:
                     print(f"捕获或翻译错误: {e}")
-                time.sleep(0.5)  # 每0.5秒更新一次，可根据需要调整
+                time.sleep(0.5)  # 调整翻译频率
 
     @QtCore.pyqtSlot(str)
     def update_translation(self, translated_text):
-        # 更新翻译结果框的文本
         self.translated_text = translated_text
         self.translation_box.parent.translated_text = translated_text
         self.update()
 
     def start_capture_thread(self):
-        # 启动捕获和翻译的线程
         self.capture_thread = threading.Thread(target=self.capture_and_translate, daemon=True)
         self.capture_thread.start()
 
     def closeEvent(self, event):
-        # 关闭窗口时停止线程
+        # 在关闭窗口时保存当前方框的位置和大小
+        selection_box_geo = f"{self.selection_box.rect.left()},{self.selection_box.rect.top()},{self.selection_box.rect.width()},{self.selection_box.rect.height()}"
+        translation_box_geo = f"{self.translation_box.rect.left()},{self.translation_box.rect.top()},{self.translation_box.rect.width()},{self.translation_box.rect.height()}"
+
+        self.settings.setValue("selection_box_geometry", selection_box_geo)
+        self.settings.setValue("translation_box_geometry", translation_box_geo)
+
         self.running = False
         self.capture_thread.join()
         super().closeEvent(event)
