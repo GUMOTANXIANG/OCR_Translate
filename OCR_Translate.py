@@ -28,25 +28,37 @@ class DraggableResizableBox:
         # 设置字体样式
         if self.is_translation_box:
             self.font = QtGui.QFont("Arial", 20)  # 增大字号
+            self.font.setBold(True)  # 可选：加粗字体，提升可读性
         else:
             self.font = QtGui.QFont()
 
     def paint(self, painter):
         painter.setRenderHint(QtGui.QPainter.Antialiasing)
-        pen = QtGui.QPen(self.color, 2, QtCore.Qt.DashLine)
-        painter.setPen(pen)
+        
         if self.is_translation_box:
-            # 翻译框背景黑色
-            brush = QtGui.QBrush(QtGui.QColor(0, 0, 0))  # 黑色背景，透明度150
+            # 设置翻译框背景白色，半透明
+            brush = QtGui.QBrush(QtGui.QColor(0, 0, 0, 150))  # 白色背景，透明度200
+            # 禁用边框绘制
+            painter.setPen(QtCore.Qt.NoPen)
+            # 或者设置半透明边框（如果需要）
+            # pen = QtGui.QPen(QtGui.QColor(0, 0, 0, 100), 2, QtCore.Qt.DashLine)
+            # painter.setPen(pen)
         else:
-            # 选择框背景绿色
-            brush = QtGui.QBrush(QtGui.QColor(self.color.red(), self.color.green(), self.color.blue(), 50))
-        painter.setBrush(brush)
+            # 设置选择框边框颜色和背景
+            pen = QtGui.QPen(self.color, 2, QtCore.Qt.DashLine)
+            painter.setPen(pen)
+            brush = QtGui.QBrush(QtGui.QColor(self.color.red(), self.color.green(), self.color.blue(), 5))
+        
+        if self.is_translation_box:
+            painter.setBrush(brush)
+        else:
+            painter.setBrush(brush)
+        
         painter.drawRect(self.rect)
 
         if self.is_translation_box and self.parent.translated_text:
             painter.setFont(self.font)
-            painter.setPen(QtGui.QPen(QtGui.QColor(255, 255, 255)))  # 白色文字
+            painter.setPen(QtGui.QPen(QtGui.QColor(255, 255, 255)))  # 黑色文字，不透明
             text_rect = self.rect.adjusted(10, 10, -10, -10)  # 增加内边距
             painter.drawText(text_rect, QtCore.Qt.TextWordWrap, self.parent.translated_text)
 
@@ -121,7 +133,7 @@ class Overlay(QtWidgets.QWidget):
             QtCore.Qt.FramelessWindowHint
         )
         self.setAttribute(QtCore.Qt.WA_TranslucentBackground)
-        self.setWindowOpacity(0.3)
+        # self.setWindowOpacity(0.3)  # 移除或注释掉这一行
         self.setGeometry(0, 0, self.screen_width, self.screen_height)
 
         # 使用QSettings存储和读取方框位置和大小
@@ -134,17 +146,22 @@ class Overlay(QtWidgets.QWidget):
         # 尝试从QSettings中读取方框信息
         selection_data = self.settings.value("selection_box_geometry", None)
         if selection_data is not None:
-            # QSettings返回的是QVariant，如果存储的是列表或字符串，需要解析
-            # 假设之前保存为字符串 "left,top,width,height"
-            left, top, width, height = map(int, selection_data.split(","))
-            selection_rect = QtCore.QRect(left, top, width, height)
+            # QSettings返回的是字符串 "left,top,width,height"
+            try:
+                left, top, width, height = map(int, selection_data.split(","))
+                selection_rect = QtCore.QRect(left, top, width, height)
+            except:
+                selection_rect = default_selection_rect
         else:
             selection_rect = default_selection_rect
 
         translation_data = self.settings.value("translation_box_geometry", None)
         if translation_data is not None:
-            left, top, width, height = map(int, translation_data.split(","))
-            translation_rect = QtCore.QRect(left, top, width, height)
+            try:
+                left, top, width, height = map(int, translation_data.split(","))
+                translation_rect = QtCore.QRect(left, top, width, height)
+            except:
+                translation_rect = default_translation_rect
         else:
             translation_rect = default_translation_rect
 
@@ -227,7 +244,7 @@ class Overlay(QtWidgets.QWidget):
                         )
                 except Exception as e:
                     print(f"捕获或翻译错误: {e}")
-                time.sleep(0.2)  # 调整翻译频率
+                time.sleep(0.3)  # 调整翻译频率
 
     @QtCore.pyqtSlot(str)
     def update_translation(self, translated_text):
