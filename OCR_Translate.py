@@ -37,7 +37,7 @@ class DraggableResizableBox:
         painter.setPen(pen)
         if self.is_translation_box:
             # 翻译框背景黑色
-            brush = QtGui.QBrush(QtGui.QColor(0, 0, 0, 150))  # 黑色背景，透明度150
+            brush = QtGui.QBrush(QtGui.QColor(0, 0, 0))  # 黑色背景，透明度150
         else:
             # 选择框背景绿色
             brush = QtGui.QBrush(QtGui.QColor(self.color.red(), self.color.green(), self.color.blue(), 50))
@@ -227,7 +227,7 @@ class Overlay(QtWidgets.QWidget):
                         )
                 except Exception as e:
                     print(f"捕获或翻译错误: {e}")
-                time.sleep(0.5)  # 调整翻译频率
+                time.sleep(0.2)  # 调整翻译频率
 
     @QtCore.pyqtSlot(str)
     def update_translation(self, translated_text):
